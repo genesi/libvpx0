@@ -657,7 +657,7 @@ process_common_toolchain() {
             elif enabled symbian; then
                 CROSS=${CROSS:-arm-none-symbianelf-}
             else
-                CROSS=${CROSS:-arm-none-linux-gnueabi-}
+                CROSS=${CROSS:-arm-linux-gnueabi-}
             fi
             link_with_cc=gcc
             setup_gnu_toolchain
@@ -670,8 +670,8 @@ process_common_toolchain() {
                 check_add_asflags -mcpu=${tgt_isa}
             elif enabled armv7
             then
-                check_add_cflags -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp  #-ftree-vectorize
-                check_add_asflags -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp  #-march=armv7-a
+                check_add_cflags -march=armv7-a -mtune=cortex-a8 -mfpu=neon #-ftree-vectorize
+                check_add_asflags -march=armv7-a -mfpu=neon
             else
                 check_add_cflags -march=${tgt_isa}
                 check_add_asflags -march=${tgt_isa}
@@ -944,7 +944,7 @@ process_common_toolchain() {
         if enabled rvct; then
             enabled small && check_add_cflags -Ospace || check_add_cflags -Otime
         else
-            enabled small && check_add_cflags -O2 ||  check_add_cflags -O3
+            enabled small && check_add_cflags -Os ||  check_add_cflags -O2
         fi
     fi
 
