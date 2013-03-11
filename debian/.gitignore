@@ -1,0 +1,8 @@
+*.debhelper
+*.debhelper.log
+*.substvars
+libvpx0/
+libvpx0-dbg/
+libvpx-dev/
+libvpx-doc/
+files

@@ -1,0 +1,130 @@
+#!/usr/bin/make -f
+
+DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+endif
+
+configure_flags += \
+  --enable-pic \
+  --enable-shared \
+  --disable-install-bins \
+  --disable-install-srcs
+
+# TODO: Special cases for ARM?
+ifeq ($(DEB_BUILD_ARCH), amd64)
+configure_flags += --target=x86_64-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), kfreebsd-amd64)
+configure_flags += --target=x86_64-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), i386)
+configure_flags += --target=x86-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), kfreebsd-i386)
+configure_flags += --target=x86-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), hurd-i386)
+configure_flags += --target=x86-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), powerpc)
+configure_flags += --target=ppc32-linux-gcc
+else
+ifeq ($(DEB_BUILD_ARCH), armel)
+configure_flags += --target=armv7-linux-gcc
+else
+configure_flags += --target=generic-gnu
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+configure_flags += --host=$(DEB_HOST_GNU_TYPE)
+endif
+
+CFLAGS += -Wall -g
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+CFLAGS += -O0
+else
+# "-O2 -march=armv7-a -mtune=cortex-a8 -mfpu=neon" are handled by the configure script
+# all we have to do is choose if we build for ARM or Thumb
+CFLAGS += -marm
+endif
+
+builddir := $(CURDIR)/builddir
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+	mkdir -p $(builddir); \
+	cd $(builddir); \
+	CFLAGS="$(CFLAGS)" $(CURDIR)/configure \
+		$(configure_flags)
+	touch $@
+
+build: build-stamp
+
+build-stamp: configure-stamp
+	dh_testdir
+	$(MAKE) -j$(NUMJOBS) -C $(builddir) verbose=yes
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f *-stamp
+	rm -rf $(builddir)
+	dh_clean
+
+install: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) -j$(NUMJOBS) -C $(builddir) verbose=yes dist
+	# don't use stripped library...
+	cp -v $(builddir)/libvpx_g.a \
+	  $(builddir)/vpx-vp8-*/lib/libvpx.a
+
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_install -i
+	dh_installchangelogs -i CHANGELOG
+	dh_installdocs -i -A README AUTHORS
+	dh_link -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_install -s
+	dh_installdocs -s -A README AUTHORS
+	dh_installchangelogs -s CHANGELOG
+	dh_link -s
+	dh_strip -s --dbg-package=libvpx0-dbg
+	dh_compress -s
+	dh_fixperms -s
+	dh_makeshlibs -plibvpx0 -V 'libvpx0 (>= 0.9.7)' -- -c4
+	dh_installdeb -s
+	dh_shlibdeps -s
+	dh_gencontrol -s
+	dh_md5sums -s
+	dh_builddeb -s
+
+binary: binary-indep binary-arch
+
+.PHONY: build clean binary-indep binary-arch binary install clean
